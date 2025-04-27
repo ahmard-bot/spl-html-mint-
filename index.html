@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create SPL Token (Meme Coin)</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #1e1e1e;
+        color: #f5f5f5;
+        padding: 20px;
+        max-width: 600px;
+        margin: auto;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0;
+        border-radius: 4px;
+        border: none;
+        font-size: 16px;
+      }
+      button {
+        background-color: #3b82f6;
+        color: white;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #2563eb;
+      }
+      #status {
+        margin-top: 12px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Create SPL Meme Token</h2>
+
+    <label>Creator Private Key (Base58):</label>
+    <input
+      id="creatorPrivateKey"
+      type="text"
+      placeholder="Enter creator’s Base58 private key"
+    />
+
+    <label>Token Name:</label>
+    <input id="tokenName" type="text" placeholder="e.g. MemeCoin" />
+
+    <label>Token Symbol:</label>
+    <input id="tokenSymbol" type="text" placeholder="e.g. MEME" />
+
+    <label>Total Supply:</label>
+    <input id="totalSupply" type="number" placeholder="e.g. 1000000" />
+
+    <label>Decimals:</label>
+    <input id="decimals" type="number" value="9" placeholder="e.g. 9" />
+
+    <label>Token Icon URL:</label>
+    <input id="iconUrl" type="text" placeholder="Optional image URL" />
+
+    <label>Description:</label>
+    <input id="description" type="text" placeholder="Optional description" />
+
+    <label>Website:</label>
+    <input id="website" type="text" placeholder="Optional website link" />
+
+    <button id="createTokenButton">Create Token</button>
+    <p id="status">Status: Idle</p>
+
+    <script type="module">
+      import { createUmi } from "https://esm.sh/@metaplex-foundation/umi-bundle-defaults@1.2.0";
+      import {
+        createAndMint,
+        TokenStandard,
+      } from "https://esm.sh/@metaplex-foundation/mpl-token-metadata@3.4.0";
+      import {
+        createSignerFromKeypair,
+        generateSigner,
+        percentAmount,
+        signerIdentity,
+      } from "https://esm.sh/@metaplex-foundation/umi@1.2.0";
+      import bs58 from "https://esm.sh/bs58@6.0.0";
+      import { mplCandyMachine } from "https://esm.sh/@metaplex-foundation/mpl-candy-machine@6.1.0";
+
+      const endpoint =
+        "https://mainnet.helius-rpc.com/?api-key=c468ac4b-f75f-422d-b7c2-b965484d3eaf";
+
+      document
+        .getElementById("createTokenButton")
+        .addEventListener("click", async () => {
+          const privateKey = document.getElementById("creatorPrivateKey").value;
+          const tokenName = document.getElementById("tokenName").value;
+          const symbol = document.getElementById("tokenSymbol").value;
+          const supply = parseInt(
+            document.getElementById("totalSupply").value,
+            10
+          );
+          const decimals = parseInt(
+            document.getElementById("decimals").value,
+            10
+          );
+          const uri = document.getElementById("iconUrl").value;
+          const statusElement = document.getElementById("status");
+
+          try {
+            statusElement.textContent = "Creating token...";
+            const umi = createUmi(endpoint);
+
+            umi.use(mplCandyMachine());
+
+            const mint = generateSigner(umi);
+
+            const userWallet = umi.eddsa.createKeypairFromSecretKey(
+              bs58.decode(privateKey)
+            );
+
+            const userWalletSigner = createSignerFromKeypair(umi, userWallet);
+            umi.use(signerIdentity(userWalletSigner));
+
+            console.log("test weallet address", userWallet.publicKey);
+
+            const result = await createAndMint(umi, {
+              mint,
+              authority: umi.identity,
+              name: tokenName,
+              symbol: symbol,
+              uri: uri,
+              decimals: decimals,
+              amount: supply,
+              tokenStandard: TokenStandard.Fungible,
+              sellerFeeBasisPoints: percentAmount(0),
+              tokenOwner: userWallet.publicKey,
+            })
+              .sendAndConfirm(umi)
+              .then(() => {
+                console.log(
+                  "Successfully minted 1 million tokens (",
+                  mint.publicKey,
+                  ")"
+                );
+              });
+
+            console.log("result", result);
+          } catch (error) {
+            console.error(error);
+            statusElement.textContent = `Error: ${error.message}`;
+          }
+        });
+    </script>
+  </body>
+</html>
